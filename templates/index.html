@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel Silk-Manager</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <h1>SilkManager</h1>
+    <nav>
+      <button data-module="dashboard">Dashboard</button>
+      <button data-module="orders">Pedidos</button>
+      <button data-module="production">Produção</button>
+      <button data-module="quotes">Orçamentos</button>
+      <button data-module="clients">Clientes</button>
+      <button data-module="financial">Financeiro</button>
+      <button data-module="reports">Relatórios</button>
+    </nav>
+  </aside>
+
+  <main>
+    <header>
+      <h2 id="module-title">Dashboard</h2>
+      <p>Painel interno para estamparia (serigrafia / silk-screen)</p>
+    </header>
+
+    <section id="dashboard" class="module active"></section>
+    <section id="orders" class="module"></section>
+    <section id="production" class="module"></section>
+    <section id="quotes" class="module"></section>
+    <section id="clients" class="module"></section>
+    <section id="financial" class="module"></section>
+    <section id="reports" class="module"></section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
