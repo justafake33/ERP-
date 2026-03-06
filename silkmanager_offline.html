@@ -1,0 +1,446 @@
+diff --git a/silkmanager_offline.html b/silkmanager_offline.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..d191258d342036f4bdc1080c5afae502115be187
+--- /dev/null
++++ b/silkmanager_offline.html
+@@ -0,0 +1,440 @@
++<!DOCTYPE html>
++<html lang="pt-BR">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <title>SilkManager Offline</title>
++  <style>
++    :root {
++      --bg: #f3f6fb;
++      --card: #fff;
++      --primary: #163a63;
++      --accent: #2d7cd3;
++      --muted: #64748b;
++      --ok: #1f8a4c;
++      --warn: #c97a00;
++      --danger: #be123c;
++    }
++    * { box-sizing: border-box; font-family: Arial, sans-serif; }
++    body { margin: 0; background: var(--bg); color: #1e293b; display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
++    aside { background: var(--primary); color: #fff; padding: 18px; }
++    h1 { margin: 0 0 16px; font-size: 1.2rem; }
++    nav { display: grid; gap: 8px; }
++    button.menu {
++      border: 0;
++      border-radius: 8px;
++      padding: 10px;
++      text-align: left;
++      cursor: pointer;
++      color: #fff;
++      background: rgba(255,255,255,.12);
++    }
++    button.menu.active,
++    button.menu:hover { background: rgba(255,255,255,.24); }
++    main { padding: 20px; }
++    .module { display: none; }
++    .module.active { display: block; }
++    .grid { display: grid; gap: 12px; }
++    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
++    .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
++    .grid-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
++    .card { background: var(--card); border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(2,8,23,.06); }
++    .card h3 { margin: 0 0 10px; font-size: 1rem; }
++    .kpi small { color: var(--muted); display: block; margin-bottom: 4px; }
++    .kpi strong { font-size: 1.4rem; color: var(--accent); }
++    .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
++    .form-grid .full { grid-column: span 3; }
++    label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
++    input, select, textarea {
++      width: 100%;
++      padding: 8px;
++      border-radius: 8px;
++      border: 1px solid #cbd5e1;
++      background: #fff;
++    }
++    textarea { min-height: 70px; resize: vertical; }
++    .btn {
++      border: 0;
++      border-radius: 8px;
++      padding: 9px 12px;
++      cursor: pointer;
++      background: var(--accent);
++      color: #fff;
++      font-weight: 600;
++    }
++    .btn.secondary { background: #334155; }
++    .btn.ok { background: var(--ok); }
++    .btn.warn { background: var(--warn); }
++    .btn.danger { background: var(--danger); }
++    table { width: 100%; border-collapse: collapse; }
++    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: .9rem; vertical-align: top; }
++    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
++    .tag { padding: 3px 8px; border-radius: 999px; background: #e2e8f0; font-size: .75rem; }
++    .hint { color: var(--muted); font-size: .85rem; }
++    .list { display: grid; gap: 8px; }
++    .item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; }
++    @media (max-width: 1100px) {
++      body { grid-template-columns: 1fr; }
++      .grid-4, .grid-3, .grid-2, .form-grid { grid-template-columns: 1fr; }
++      .form-grid .full { grid-column: auto; }
++    }
++  </style>
++</head>
++<body>
++  <aside>
++    <h1>SilkManager Offline</h1>
++    <nav id="menu"></nav>
++    <hr style="border-color: rgba(255,255,255,.2); margin: 14px 0;" />
++    <button class="menu" onclick="exportData()">Exportar backup (.json)</button>
++    <label class="menu" style="display:block;cursor:pointer;">
++      Importar backup
++      <input type="file" accept="application/json" onchange="importData(event)" style="display:none" />
++    </label>
++    <p class="hint" style="color:#cbd5e1; margin-top:12px;">Dados salvos no navegador (localStorage).</p>
++  </aside>
++
++  <main>
++    <header style="margin-bottom:14px;">
++      <h2 id="title" style="margin:0;">Dashboard</h2>
++      <p class="hint">Sistema simples para pedidos, produção, clientes, orçamento e financeiro.</p>
++    </header>
++
++    <section id="dashboard" class="module active"></section>
++    <section id="pedidos" class="module"></section>
++    <section id="producao" class="module"></section>
++    <section id="orcamentos" class="module"></section>
++    <section id="clientes" class="module"></section>
++    <section id="financeiro" class="module"></section>
++    <section id="relatorios" class="module"></section>
++  </main>
++
++  <script>
++    const STATUS = ["orçamento", "aprovado", "aguardando produção", "Amostra", "em produção", "finalizado"];
++    const MODULES = [
++      ["dashboard", "Dashboard"],
++      ["pedidos", "Pedidos"],
++      ["producao", "Produção"],
++      ["orcamentos", "Orçamentos"],
++      ["clientes", "Clientes"],
++      ["financeiro", "Financeiro"],
++      ["relatorios", "Relatórios"]
++    ];
++
++    const state = loadState();
++
++    function loadState() {
++      const raw = localStorage.getItem("silkmanager_offline_v1");
++      if (raw) return JSON.parse(raw);
++      const today = new Date().toISOString().slice(0,10);
++      const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
++      return {
++        clients: [{ id: 1, name: "Joana Silva", company: "Brinde Sul", phone: "(11) 99999-1001", email: "joana@brindesul.com", address: "Rua das Oficinas, 88", document: "12.345.678/0001-90", notes: "Cliente recorrente" }],
++        quotes: [{ id: 1, clientId: 1, product: "Ecobag", quantity: 1200, colors: 2, value: 6840, notes: "Frente e verso", createdAt: today }],
++        orders: [{ id: 1, clientId: 1, date: today, dueDate: tomorrow, status: "aguardando produção", product: "Ecobag", quantity: 1200, sizes: "único:1200", colors: 2, pantone: "186 C, Black C", material: "fornecido pelo cliente", price: 6840, notes: "Evento no final de semana", history: ["Pedido criado"] }],
++        financial: [{ id: 1, kind: "entrada", partner: "Brinde Sul", value: 3420, date: today, category: "pagamento parcial", orderId: 1, notes: "50% na aprovação" }],
++        seq: { clients: 2, quotes: 2, orders: 2, financial: 2 }
++      };
++    }
++
++    function saveState() {
++      localStorage.setItem("silkmanager_offline_v1", JSON.stringify(state));
++    }
++
++    function fmtMoney(v){ return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
++    function clientName(id){ return state.clients.find(c=>c.id===Number(id))?.name || "-"; }
++
++    function setupMenu(){
++      const menu = document.getElementById('menu');
++      menu.innerHTML = MODULES.map(([key,label],i)=>`<button class="menu ${i===0?'active':''}" data-key="${key}">${label}</button>`).join('');
++      menu.querySelectorAll('button.menu').forEach(btn=>btn.onclick=()=>openModule(btn.dataset.key, btn));
++    }
++
++    function openModule(key, btn){
++      document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
++      document.getElementById(key).classList.add('active');
++      document.querySelectorAll('#menu button.menu').forEach(b=>b.classList.remove('active'));
++      if(btn) btn.classList.add('active');
++      document.getElementById('title').textContent = MODULES.find(([k])=>k===key)?.[1] || key;
++      renderAll();
++    }
++
++    function renderDashboard(){
++      const nowMonth = new Date().toISOString().slice(0,7);
++      const monthRevenue = state.orders.filter(o=>o.date.slice(0,7)===nowMonth).reduce((a,b)=>a+Number(b.price||0),0);
++      const inProduction = state.orders.filter(o=>["aguardando produção","Amostra","em produção"].includes(o.status)).length;
++      const delivered = state.orders.filter(o=>o.status==="finalizado").length;
++      const delayed = state.orders.filter(o=>o.status!=="finalizado" && o.dueDate < new Date().toISOString().slice(0,10)).length;
++      const topClients = [...state.clients].map(c=>({name:c.name,total:state.orders.filter(o=>o.clientId===c.id).reduce((a,b)=>a+Number(b.price||0),0)})).sort((a,b)=>b.total-a.total).slice(0,5);
++
++      dashboard.innerHTML = `
++        <div class="grid grid-4">
++          <div class="card kpi"><small>Faturamento do mês</small><strong>${fmtMoney(monthRevenue)}</strong></div>
++          <div class="card kpi"><small>Pedidos em produção</small><strong>${inProduction}</strong></div>
++          <div class="card kpi"><small>Pedidos entregues</small><strong>${delivered}</strong></div>
++          <div class="card kpi"><small>Pedidos atrasados</small><strong>${delayed}</strong></div>
++        </div>
++        <div class="card" style="margin-top:12px;">
++          <h3>Clientes que mais compram</h3>
++          <table><thead><tr><th>Cliente</th><th>Total</th></tr></thead><tbody>
++            ${topClients.map(c=>`<tr><td>${c.name}</td><td>${fmtMoney(c.total)}</td></tr>`).join('') || '<tr><td colspan="2">Sem dados</td></tr>'}
++          </tbody></table>
++        </div>`;
++    }
++
++    function renderClients(){
++      clientes.innerHTML = `
++        <div class="card">
++          <h3>Novo cliente</h3>
++          <form id="fClient" class="form-grid">
++            <div><label>Nome</label><input required name="name"></div>
++            <div><label>Empresa</label><input name="company"></div>
++            <div><label>Telefone</label><input name="phone"></div>
++            <div><label>Email</label><input name="email"></div>
++            <div><label>Endereço</label><input name="address"></div>
++            <div><label>CNPJ/CPF</label><input name="document"></div>
++            <div class="full"><label>Observações</label><textarea name="notes"></textarea></div>
++            <div class="full"><button class="btn">Salvar cliente</button></div>
++          </form>
++        </div>
++        <div class="card" style="margin-top:12px;">
++          <h3>CRM de clientes</h3>
++          <table>
++            <thead><tr><th>Nome</th><th>Empresa</th><th>Telefone</th><th>Total já comprado</th><th>Último pedido</th></tr></thead>
++            <tbody>
++              ${state.clients.map(c=>{
++                const orders = state.orders.filter(o=>o.clientId===c.id);
++                const total = orders.reduce((a,b)=>a+Number(b.price||0),0);
++                const last = orders.sort((a,b)=>b.date.localeCompare(a.date))[0]?.date || '-';
++                return `<tr><td>${c.name}</td><td>${c.company||'-'}</td><td>${c.phone||'-'}</td><td>${fmtMoney(total)}</td><td>${last}</td></tr>`;
++              }).join('')}
++            </tbody>
++          </table>
++        </div>`;
++      fClient.onsubmit = (e)=>{
++        e.preventDefault();
++        const d = Object.fromEntries(new FormData(e.target).entries());
++        d.id = state.seq.clients++;
++        state.clients.push(d);
++        saveState();
++        renderAll();
++      };
++    }
++
++    function renderQuotes(){
++      orcamentos.innerHTML = `
++        <div class="card">
++          <h3>Novo orçamento</h3>
++          <form id="fQuote" class="form-grid">
++            <div><label>Cliente</label><select name="clientId" required>${state.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
++            <div><label>Produto</label><input name="product" required></div>
++            <div><label>Quantidade</label><input type="number" name="quantity" required></div>
++            <div><label>Cores</label><input type="number" name="colors" required></div>
++            <div><label>Valor</label><input type="number" step="0.01" name="value" required></div>
++            <div class="full"><label>Observações</label><textarea name="notes"></textarea></div>
++            <div class="full"><button class="btn">Salvar orçamento</button></div>
++          </form>
++        </div>
++        <div class="card" style="margin-top:12px;">
++          <h3>Histórico de orçamentos</h3>
++          <table><thead><tr><th>Cliente</th><th>Produto</th><th>Qtd</th><th>Cores</th><th>Valor</th><th>Ação</th></tr></thead><tbody>
++            ${state.quotes.map(q=>`<tr><td>${clientName(q.clientId)}</td><td>${q.product}</td><td>${q.quantity}</td><td>${q.colors}</td><td>${fmtMoney(q.value)}</td><td><button class="btn ok" onclick="convertQuote(${q.id})">Converter em pedido</button></td></tr>`).join('') || '<tr><td colspan="6">Sem orçamentos</td></tr>'}
++          </tbody></table>
++        </div>`;
++      fQuote.onsubmit = (e)=>{
++        e.preventDefault();
++        const d = Object.fromEntries(new FormData(e.target).entries());
++        d.id = state.seq.quotes++;
++        d.clientId = Number(d.clientId);
++        d.quantity = Number(d.quantity);
++        d.colors = Number(d.colors);
++        d.value = Number(d.value);
++        d.createdAt = new Date().toISOString().slice(0,10);
++        state.quotes.push(d);
++        saveState();
++        renderAll();
++      };
++    }
++
++    function convertQuote(id){
++      const q = state.quotes.find(x=>x.id===id);
++      if(!q) return;
++      state.orders.push({
++        id: state.seq.orders++,
++        clientId: q.clientId,
++        date: new Date().toISOString().slice(0,10),
++        dueDate: new Date(Date.now()+86400000).toISOString().slice(0,10),
++        status: 'aprovado',
++        product: q.product,
++        quantity: q.quantity,
++        sizes: 'único:'+q.quantity,
++        colors: q.colors,
++        pantone: '',
++        material: 'vendido pela empresa',
++        price: q.value,
++        notes: q.notes || '',
++        history: ['Convertido de orçamento #'+id]
++      });
++      saveState();
++      renderAll();
++      alert('Orçamento convertido em pedido!');
++    }
++
++    function renderOrders(){
++      pedidos.innerHTML = `
++        <div class="card">
++          <h3>Novo pedido</h3>
++          <form id="fOrder" class="form-grid">
++            <div><label>Cliente</label><select name="clientId" required>${state.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
++            <div><label>Data pedido</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div>
++            <div><label>Prazo entrega</label><input type="date" name="dueDate" required></div>
++            <div><label>Status</label><select name="status">${STATUS.map(s=>`<option>${s}</option>`).join('')}</select></div>
++            <div><label>Produto</label><input name="product" required></div>
++            <div><label>Quantidade</label><input type="number" name="quantity" required></div>
++            <div><label>Cores da estampa</label><input type="number" name="colors" required></div>
++            <div><label>Pantone</label><input name="pantone" placeholder="186 C, Black C"></div>
++            <div><label>Tamanhos</label><input name="sizes" placeholder="P:20,M:30,G:10"></div>
++            <div><label>Material</label><select name="material"><option>fornecido pelo cliente</option><option>vendido pela empresa</option></select></div>
++            <div><label>Preço</label><input type="number" step="0.01" name="price" required></div>
++            <div class="full"><label>Observações</label><textarea name="notes"></textarea></div>
++            <div class="full"><button class="btn">Salvar pedido</button></div>
++          </form>
++        </div>
++        <div class="card" style="margin-top:12px;">
++          <h3>Histórico de pedidos</h3>
++          <table><thead><tr><th>ID</th><th>Cliente</th><th>Produto</th><th>Qtd</th><th>Status</th><th>Prazo</th><th>Preço</th><th>Alterar status</th></tr></thead><tbody>
++            ${state.orders.map(o=>`<tr>
++              <td>#${o.id}</td><td>${clientName(o.clientId)}</td><td>${o.product}</td><td>${o.quantity}</td>
++              <td><span class="tag">${o.status}</span></td><td>${o.dueDate}</td><td>${fmtMoney(o.price)}</td>
++              <td><select onchange="updateOrderStatus(${o.id}, this.value)">${STATUS.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>
++            </tr>`).join('') || '<tr><td colspan="8">Sem pedidos</td></tr>'}
++          </tbody></table>
++        </div>`;
++      fOrder.onsubmit = (e)=>{
++        e.preventDefault();
++        const d = Object.fromEntries(new FormData(e.target).entries());
++        d.id = state.seq.orders++;
++        d.clientId = Number(d.clientId);
++        d.quantity = Number(d.quantity);
++        d.colors = Number(d.colors);
++        d.price = Number(d.price);
++        d.history = ['Pedido criado'];
++        state.orders.push(d);
++        saveState();
++        renderAll();
++      };
++    }
++
++    function updateOrderStatus(id, status){
++      const order = state.orders.find(o=>o.id===id);
++      if(!order) return;
++      order.history = order.history || [];
++      order.history.push(`Status alterado: ${order.status} -> ${status}`);
++      order.status = status;
++      saveState();
++      renderAll();
++    }
++
++    function renderProduction(){
++      const today = new Date().toISOString().slice(0,10);
++      const inProd = state.orders.filter(o=>["aguardando produção","Amostra","em produção"].includes(o.status));
++      const dueToday = state.orders.filter(o=>o.dueDate===today);
++      const delayed = state.orders.filter(o=>o.status!=="finalizado" && o.dueDate<today);
++      const block = (title, items) => `<div class="card"><h3>${title}</h3><div class="list">${items.map(o=>`<div class="item"><strong>${clientName(o.clientId)}</strong> · ${o.product}<br>Qtd ${o.quantity} | Cores ${o.colors} | Prazo ${o.dueDate}<br><small>${o.notes||'Sem observações'}</small></div>`).join('') || 'Sem pedidos'}</div></div>`;
++      producao.innerHTML = `<div class="grid grid-3">${block('Em produção', inProd)}${block('Prazo para hoje', dueToday)}${block('Atrasados', delayed)}</div>`;
++    }
++
++    function renderFinancial(){
++      const entries = state.financial.filter(f=>f.kind==='entrada').reduce((a,b)=>a+Number(b.value),0);
++      const expenses = state.financial.filter(f=>f.kind==='saida').reduce((a,b)=>a+Number(b.value),0);
++      financeiro.innerHTML = `
++        <div class="card">
++          <h3>Novo lançamento financeiro</h3>
++          <form id="fFin" class="form-grid">
++            <div><label>Tipo</label><select name="kind"><option>entrada</option><option>saida</option></select></div>
++            <div><label>Cliente/Fornecedor</label><input name="partner"></div>
++            <div><label>Valor</label><input type="number" step="0.01" name="value" required></div>
++            <div><label>Data</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div>
++            <div><label>Categoria</label><input name="category" placeholder="tintas, aluguel..."></div>
++            <div><label>Pedido relacionado (ID)</label><input type="number" name="orderId"></div>
++            <div class="full"><label>Observações</label><textarea name="notes"></textarea></div>
++            <div class="full"><button class="btn">Salvar lançamento</button></div>
++          </form>
++        </div>
++        <div class="grid grid-3" style="margin-top:12px;">
++          <div class="card kpi"><small>Entradas</small><strong>${fmtMoney(entries)}</strong></div>
++          <div class="card kpi"><small>Saídas</small><strong>${fmtMoney(expenses)}</strong></div>
++          <div class="card kpi"><small>Saldo</small><strong>${fmtMoney(entries-expenses)}</strong></div>
++        </div>
++        <div class="card" style="margin-top:12px;">
++          <h3>Histórico financeiro</h3>
++          <table><thead><tr><th>Tipo</th><th>Parceiro</th><th>Data</th><th>Categoria</th><th>Valor</th></tr></thead><tbody>
++            ${state.financial.map(f=>`<tr><td>${f.kind}</td><td>${f.partner||'-'}</td><td>${f.date}</td><td>${f.category||'-'}</td><td>${fmtMoney(f.value)}</td></tr>`).join('') || '<tr><td colspan="5">Sem lançamentos</td></tr>'}
++          </tbody></table>
++        </div>`;
++      fFin.onsubmit=(e)=>{
++        e.preventDefault();
++        const d = Object.fromEntries(new FormData(e.target).entries());
++        d.id = state.seq.financial++;
++        d.value = Number(d.value);
++        d.orderId = d.orderId ? Number(d.orderId) : null;
++        state.financial.push(d);
++        saveState();
++        renderAll();
++      };
++    }
++
++    function renderReports(){
++      const byClient = state.clients.map(c=>({client:c.name, totalOrders: state.orders.filter(o=>o.clientId===c.id).length, totalValue: state.orders.filter(o=>o.clientId===c.id).reduce((a,b)=>a+Number(b.price||0),0)})).sort((a,b)=>b.totalValue-a.totalValue);
++      relatorios.innerHTML = `
++        <div class="grid grid-2">
++          <div class="card"><h3>Relatório de produção</h3><p>Total de pedidos: <strong>${state.orders.length}</strong></p><p>Em produção: <strong>${state.orders.filter(o=>['aguardando produção','Amostra','em produção'].includes(o.status)).length}</strong></p></div>
++          <div class="card"><h3>Relatório financeiro</h3><p>Lançamentos: <strong>${state.financial.length}</strong></p><p>Faturamento (entradas): <strong>${fmtMoney(state.financial.filter(f=>f.kind==='entrada').reduce((a,b)=>a+Number(b.value),0))}</strong></p></div>
++        </div>
++        <div class="card" style="margin-top:12px;">
++          <h3>Pedidos por cliente</h3>
++          <table><thead><tr><th>Cliente</th><th>Pedidos</th><th>Total</th></tr></thead><tbody>
++            ${byClient.map(r=>`<tr><td>${r.client}</td><td>${r.totalOrders}</td><td>${fmtMoney(r.totalValue)}</td></tr>`).join('')}
++          </tbody></table>
++        </div>`;
++    }
++
++    function exportData(){
++      const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
++      const a = document.createElement('a');
++      a.href = URL.createObjectURL(blob);
++      a.download = 'silkmanager-backup.json';
++      a.click();
++      URL.revokeObjectURL(a.href);
++    }
++
++    function importData(event){
++      const file = event.target.files[0];
++      if(!file) return;
++      const reader = new FileReader();
++      reader.onload = () => {
++        try {
++          const parsed = JSON.parse(reader.result);
++          localStorage.setItem('silkmanager_offline_v1', JSON.stringify(parsed));
++          location.reload();
++        } catch {
++          alert('Arquivo inválido.');
++        }
++      };
++      reader.readAsText(file);
++    }
++
++    function renderAll(){
++      renderDashboard();
++      renderClients();
++      renderQuotes();
++      renderOrders();
++      renderProduction();
++      renderFinancial();
++      renderReports();
++    }
++
++    setupMenu();
++    renderAll();
++  </script>
++</body>
++</html>
